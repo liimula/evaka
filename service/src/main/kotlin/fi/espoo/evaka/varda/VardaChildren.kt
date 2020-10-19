@@ -43,7 +43,8 @@ private fun createPersons(
 }
 
 private fun createChildren(h: Handle, client: VardaClient) {
-    val vardaChildren = getChildrenToUpload(client.getPersonUrl, client.getOrganizerUrl, h)
+    updateChildOrganizerOids(h)
+    val vardaChildren = getChildrenToUpload(client.getPersonUrl, h)
     vardaChildren.forEach { vardaChild ->
         client.createChild(vardaChild)
             ?.let { vardaChildResponse -> updateChild(vardaChildResponse, vardaChild.id, h) }
@@ -93,35 +94,44 @@ private fun insertPerson(vardaPersonResponse: VardaPersonResponse, personId: UUI
         .execute()
 }
 
+private fun updateChildOrganizerOids(h: Handle) {
+    val sql =
+        """
+        WITH child_organizer AS (
+            SELECT p.child_id, d.oph_organizer_oid FROM placement p JOIN daycare d ON p.unit_id = d.id AND daterange(p.start_date, p.end_date, '[]') @> current_date
+        )
+        UPDATE varda_child vc SET oph_organizer_oid = (SELECT oph_organizer_oid FROM child_organizer WHERE child_id = vc.person_id)
+        """.trimIndent()
+
+    h.createUpdate(sql)
+        .execute()
+}
+
 private fun getChildrenToUpload(
     getPersonUrl: (Long) -> String,
-    getOrganizerUrl: (Long) -> String,
     h: Handle
 ): List<VardaChildRequest> {
     //language=SQL
     val sql =
         """
-        SELECT varda_child.id, varda_person_id, varda_organizer.varda_organizer_id
-            FROM varda_child
-            LEFT JOIN LATERAL (SELECT varda_organizer_id FROM varda_organizer WHERE organizer = 'Espoo') varda_organizer
-                ON TRUE
-            WHERE varda_child.varda_child_id IS NULL;
+        SELECT id, varda_person_id, oph_organizer_oid
+        FROM varda_child
+        WHERE varda_child_id IS NULL AND oph_organizer_oid IS NOT NULL;
         """.trimIndent()
 
     return h.createQuery(sql)
-        .map(toVardaChildRequest(getPersonUrl, getOrganizerUrl))
+        .map(toVardaChildRequest(getPersonUrl))
         .list()
 }
 
 private fun toVardaChildRequest(
-    getPersonUrl: (Long) -> String,
-    getOrganizerUrl: (Long) -> String
+    getPersonUrl: (Long) -> String
 ): (ResultSet, StatementContext) -> VardaChildRequest =
     { rs, _ ->
         VardaChildRequest(
             id = rs.getUUID("id"),
             personUrl = getPersonUrl(rs.getLong("varda_person_id")),
-            organizerUrl = getOrganizerUrl(rs.getLong("varda_organizer_id"))
+            organizerOid = rs.getString("oph_organizer_oid")
         )
     }
 
@@ -176,7 +186,7 @@ data class VardaChildRequest(
     @JsonProperty("henkilo")
     val personUrl: String,
     @JsonProperty("vakatoimija")
-    val organizerUrl: String
+    val organizerOid: String
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
