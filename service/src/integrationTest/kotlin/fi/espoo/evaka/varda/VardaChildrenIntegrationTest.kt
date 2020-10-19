@@ -138,6 +138,28 @@ class VardaChildrenIntegrationTest : FullApplicationTest() {
         }
     }
 
+    @Test
+    fun `varda child gets organizer oid from daycare`() {
+        jdbi.handle { h ->
+            h.createUpdate("UPDATE daycare SET oph_organizer_oid = '1.1.1.1.1' WHERE id = :id")
+                .bind("id", testDaycare.id)
+                .execute()
+
+            insertTestPlacement(
+                h = h,
+                childId = testChild_1.id,
+                unitId = testDaycare.id,
+                startDate = LocalDate.now().minusMonths(2),
+                endDate = LocalDate.now().plusMonths(1)
+            )
+
+            uploadChildren(h)
+            val organizerOid = getUploadedChildren(h)[0].ophOrganizerOid
+
+            assertEquals("1.1.1.1.1", organizerOid)
+        }
+    }
+
     private fun uploadChildren(h: Handle) {
         updateChildren(h, vardaClient)
     }
@@ -173,6 +195,7 @@ data class VardaChildRow(
     val vardaPersonId: Int,
     val vardaPersonOid: String,
     val vardaChildId: Int?,
+    val ophOrganizerOid: String?,
     val createdAt: Instant,
     val modifiedAt: Instant,
     val uploadedAt: Instant?
