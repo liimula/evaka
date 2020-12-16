@@ -8,5 +8,11 @@ set -e
 
 cd "$( dirname "${BASH_SOURCE[0]}")"
 
-docker-compose -f docker-compose.yml -f docker-compose.keycloak.yml $@
+# We want to replace this with evaka in future
+if ! test -d "./keycloak/helsinki-keycloak-theme/"; then
+  cd ./keycloak
+  git clone https://github.com/City-of-Helsinki/helsinki-keycloak-theme.git
+  cd ..
+fi
 
+docker-compose -f docker-compose.yml -f docker-compose.keycloak.yml $@

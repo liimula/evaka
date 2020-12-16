@@ -8,6 +8,11 @@ services:
     environment:
       KEYCLOAK_USER: admin
       KEYCLOAK_PASSWORD: admin
+      # KEYCLOAK_WELCOME_THEME: evaka
+    volumes:
+      - ./keycloak/configuration:/configuration
+      - ./keycloak/helsinki-keycloak-theme/helsinki:/opt/jboss/keycloak/themes/evaka # We want to change this in future
+    entrypoint: /configuration/entrypoint-configuration.sh
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
       interval: 2s
@@ -21,10 +26,10 @@ services:
       - "8025:8025"
 
   configure-keycloak:
-   image: quay.io/keycloak/keycloak:11.0.3
-   environment:
-     KEYCLOAK_USER: admin
-     KEYCLOAK_PASSWORD: admin
-   volumes:
-     - ./keycloak/configuration:/configuration
-   entrypoint: /configuration/entrypoint-realm.sh
+    image: quay.io/keycloak/keycloak:11.0.3
+    environment:
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: admin
+    volumes:
+      - ./keycloak/configuration:/configuration
+    entrypoint: /configuration/entrypoint-realm.sh
